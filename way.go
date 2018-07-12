@@ -129,16 +129,6 @@ func (r Router) Add(path string, route ...uint) error {
 	return nil
 }
 
-// RmPath removes a path from the router
-func (r Router) RmPath(path string) {
-
-}
-
-// RmRoute removes a route from the router
-func (r Router) RmRoute(route ...uint) {
-
-}
-
 // GetPath gets the path from the given route and parameters
 func (r Router) GetPath(params map[string]string, route ...uint) (path string, err error) {
 	return "", nil
