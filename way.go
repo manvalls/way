@@ -24,6 +24,11 @@ type Router struct {
 	routeRoot *routePart
 }
 
+// NewRouter builds a new router instance
+func NewRouter() Router {
+	return Router{&pathPart{children: map[string]*pathPart{}}, &routePart{children: map[uint]*routePart{}}}
+}
+
 // Add adds a route to the router
 func (r Router) Add(path string, route ...uint) error {
 	pathParent := r.pathRoot
