@@ -77,6 +77,8 @@ func (r Router) Add(path string, route ...uint) error {
 		}
 
 		pathParent = nextParent
+		currentParam = ""
+		currentPart = ""
 		return
 	}
 
