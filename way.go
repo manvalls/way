@@ -1,6 +1,9 @@
 package way
 
-import "net/url"
+import (
+	"errors"
+	"net/url"
+)
 
 type pathPart struct {
 	children   map[string]*pathPart
@@ -134,9 +137,45 @@ func (r Router) Add(path string, route ...uint) error {
 	return nil
 }
 
+// ErrNotFound is returned when the requested route could not be found
+var ErrNotFound = errors.New("Requested route not found")
+
+// ErrMissingParam is returned when there is a missing parameter
+var ErrMissingParam = errors.New("Missing parameter")
+
 // GetPath gets the path from the given route and parameters
-func (r Router) GetPath(params map[string]string, route ...uint) (path string, err error) {
-	return "", nil
+func (r Router) GetPath(params map[string]string, route ...uint) (string, error) {
+	parent := r.routeRoot
+	for _, i := range route {
+		parent = parent.children[i]
+		if parent == nil {
+			return "", ErrNotFound
+		}
+	}
+
+	if parent.path == nil {
+		return "", ErrNotFound
+	}
+
+	path := ""
+	for _, bit := range parent.path {
+		if bit.isParam {
+			param := params[bit.part]
+			if param == "" {
+				return "", ErrMissingParam
+			}
+
+			path += "/" + param
+		} else {
+			path += "/" + bit.part
+		}
+	}
+
+	if path == "" {
+		return "/", nil
+	}
+
+	return path, nil
 }
 
 // GetRoute gets the route and params for the given path
