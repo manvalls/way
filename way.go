@@ -3,10 +3,12 @@ package way
 import (
 	"errors"
 	"net/url"
+	"strings"
 )
 
 type pathPart struct {
 	children   map[string]*pathPart
+	suffix     *pathPart
 	match      []uint
 	parameters []string
 }
@@ -17,8 +19,9 @@ type routePart struct {
 }
 
 type matchedPathBit struct {
-	part    string
-	isParam bool
+	part     string
+	isParam  bool
+	isSuffix bool
 }
 
 // Router holds the list of routings and mappings
@@ -40,13 +43,26 @@ func (r Router) Add(path string, route ...uint) error {
 	isParam := false
 	matched := []*matchedPathBit{}
 	params := []string{}
+	hasSuffix := false
 
 	flush := func() (err error) {
 		next := ""
+		isSuffix := false
 
 		if isParam {
 			if currentParam == "" {
 				return
+			}
+
+			if hasSuffix {
+				return ErrMiddleSuffix
+			}
+
+			lastPos := len(currentParam) - 1
+			if currentParam[lastPos] == '*' {
+				currentParam = currentParam[:lastPos]
+				isSuffix = true
+				hasSuffix = true
 			}
 
 			currentParam, err = url.QueryUnescape(currentParam)
@@ -54,11 +70,15 @@ func (r Router) Add(path string, route ...uint) error {
 				return
 			}
 
-			matched = append(matched, &matchedPathBit{currentParam, true})
+			matched = append(matched, &matchedPathBit{currentParam, true, isSuffix})
 			params = append(params, currentParam)
 		} else {
 			if currentPart == "" {
 				return
+			}
+
+			if hasSuffix {
+				return ErrMiddleSuffix
 			}
 
 			currentPart, err = url.QueryUnescape(currentPart)
@@ -66,17 +86,26 @@ func (r Router) Add(path string, route ...uint) error {
 				return
 			}
 
-			matched = append(matched, &matchedPathBit{currentPart, false})
+			matched = append(matched, &matchedPathBit{currentPart, false, false})
 			next = currentPart
 		}
 
-		nextParent := pathParent.children[next]
-		if nextParent == nil {
-			nextParent = &pathPart{children: map[string]*pathPart{}}
-			pathParent.children[next] = nextParent
+		if !isSuffix {
+			nextParent := pathParent.children[next]
+			if nextParent == nil {
+				nextParent = &pathPart{children: map[string]*pathPart{}}
+				pathParent.children[next] = nextParent
+			}
+			pathParent = nextParent
+		} else {
+			nextParent := pathParent.suffix
+			if nextParent == nil {
+				nextParent = &pathPart{children: map[string]*pathPart{}}
+				pathParent.suffix = nextParent
+			}
+			pathParent = nextParent
 		}
 
-		pathParent = nextParent
 		currentParam = ""
 		currentPart = ""
 		isParam = false
@@ -146,6 +175,9 @@ var ErrNotFound = errors.New("Requested route not found")
 // ErrMissingParam is returned when there is a missing parameter
 var ErrMissingParam = errors.New("Missing parameter")
 
+// ErrMiddleSuffix is returned when the provided path contains a suffix not located at the end
+var ErrMiddleSuffix = errors.New("Suffix parameters can only happen at the end of the path")
+
 // GetPath gets the path from the given route and parameters
 func (r Router) GetPath(params map[string]string, route ...uint) (string, error) {
 	parent := r.routeRoot
@@ -168,7 +200,11 @@ func (r Router) GetPath(params map[string]string, route ...uint) (string, error)
 				return "", ErrMissingParam
 			}
 
-			path += "/" + url.QueryEscape(param)
+			if !bit.isSuffix {
+				param = url.QueryEscape(param)
+			}
+
+			path += "/" + param
 		} else {
 			path += "/" + bit.part
 		}
@@ -206,6 +242,11 @@ func match(parts []string, params []string, parent *pathPart) ([]string, *pathPa
 				return p, m, nil
 			}
 		}
+	}
+
+	if parent.suffix != nil {
+		nextParams := append(params, strings.Join(parts, "/"))
+		return match([]string{}, nextParams, parent.suffix)
 	}
 
 	return nil, nil, ErrNotFound

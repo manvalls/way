@@ -9,6 +9,7 @@ func getRouter() Router {
 	r.Add("/", 0)
 	r.Add("/foo/:bar", 0, 1)
 	r.Add("/:foo/bar", 0, 2)
+	r.Add("/:foo/bar/:suffix*", 1)
 	return r
 }
 
@@ -71,6 +72,11 @@ func TestGetRoute(t *testing.T) {
 	assertParams(params, map[string]string{"foo": "fooo"}, t)
 	assertRoute(route, []uint{0, 2}, t)
 
+	params, route, err = r.GetRoute("/test/bar/an/interesting/suffix")
+	assertNoError(err, t)
+	assertParams(params, map[string]string{"foo": "test", "suffix": "an/interesting/suffix"}, t)
+	assertRoute(route, []uint{1}, t)
+
 	_, _, err = r.GetRoute("/faasdasd")
 	if err != ErrNotFound {
 		t.Fatal("Expected error to be returned")
@@ -91,6 +97,10 @@ func TestGetPath(t *testing.T) {
 	path, err = r.GetPath(map[string]string{"foo": "fooo"}, 0, 2)
 	assertNoError(err, t)
 	assertPath(path, "/fooo/bar", t)
+
+	path, err = r.GetPath(map[string]string{"foo": "test", "suffix": "an/interesting/suffix"}, 1)
+	assertNoError(err, t)
+	assertPath(path, "/test/bar/an/interesting/suffix", t)
 
 	_, err = r.GetPath(nil, 5)
 	if err != ErrNotFound {
