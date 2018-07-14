@@ -180,7 +180,90 @@ func (r Router) GetPath(params map[string]string, route ...uint) (string, error)
 	return path, nil
 }
 
+func match(parts []string, params []string, parent *pathPart) ([]string, *pathPart, error) {
+	if len(parts) == 0 {
+		if parent.match == nil {
+			return nil, nil, ErrNotFound
+		}
+
+		return params, parent, nil
+	}
+
+	keys := []string{parts[0], ""}
+	nextParts := parts[1:]
+
+	for _, key := range keys {
+		child := parent.children[key]
+		if child != nil {
+			nextParams := params
+			if key == "" {
+				nextParams = append(params, parts[0])
+			}
+
+			p, m, err := match(nextParts, nextParams, child)
+			if err == nil {
+				return p, m, nil
+			}
+		}
+	}
+
+	return nil, nil, ErrNotFound
+}
+
 // GetRoute gets the route and params for the given path
-func (r Router) GetRoute(path string) (params map[string]string, route []uint, err error) {
-	return nil, nil, nil
+func (r Router) GetRoute(path string) (map[string]string, []uint, error) {
+	currentPart := ""
+	parts := []string{}
+
+	flush := func() (err error) {
+		if currentPart == "" {
+			return
+		}
+
+		currentPart, err = url.QueryUnescape(currentPart)
+		if err != nil {
+			return err
+		}
+
+		parts = append(parts, currentPart)
+		currentPart = ""
+		return
+	}
+
+	for c := range path {
+		switch c {
+		case '/':
+			err := flush()
+			if err != nil {
+				return nil, nil, err
+			}
+
+		case '?':
+			err := flush()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			break
+		default:
+			currentPart += string(c)
+		}
+	}
+
+	err := flush()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	paramList, matchedPart, err := match(parts, []string{}, r.pathRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	params := make(map[string]string)
+	for i, p := range matchedPart.parameters {
+		params[p] = paramList[i]
+	}
+
+	return params, matchedPart.match, nil
 }
