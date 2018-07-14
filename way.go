@@ -82,7 +82,7 @@ func (r Router) Add(path string, route ...uint) error {
 		return
 	}
 
-	for c := range path {
+	for _, c := range path {
 		switch c {
 		case '/':
 			err := flush()
@@ -230,7 +230,7 @@ func (r Router) GetRoute(path string) (map[string]string, []uint, error) {
 		return
 	}
 
-	for c := range path {
+	for _, c := range path {
 		switch c {
 		case '/':
 			err := flush()
