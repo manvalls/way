@@ -168,7 +168,7 @@ func (r Router) GetPath(params map[string]string, route ...uint) (string, error)
 				return "", ErrMissingParam
 			}
 
-			path += "/" + param
+			path += "/" + url.QueryEscape(param)
 		} else {
 			path += "/" + bit.part
 		}
