@@ -127,7 +127,7 @@ func (r Router) Add(path string, route ...uint) error {
 	routeParent := r.routeRoot
 	for _, routeBit := range route {
 		nextParent := routeParent.children[routeBit]
-		if routeParent == nil {
+		if nextParent == nil {
 			nextParent = &routePart{children: map[uint]*routePart{}}
 			routeParent.children[routeBit] = nextParent
 		}
