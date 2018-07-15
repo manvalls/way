@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+// Params hold information about provided or matched URL parameters
+type Params = map[string]string
+
+// Route contains the matched route
+type Route = []uint
+
 type pathPart struct {
 	children   map[string]*pathPart
 	suffix     *pathPart
@@ -179,7 +185,7 @@ var ErrMissingParam = errors.New("Missing parameter")
 var ErrMiddleSuffix = errors.New("Suffix parameters can only happen at the end of the path")
 
 // GetPath gets the path from the given route and parameters
-func (r Router) GetPath(params map[string]string, route ...uint) (string, error) {
+func (r Router) GetPath(params Params, route ...uint) (string, error) {
 	parent := r.routeRoot
 	for _, i := range route {
 		parent = parent.children[i]
@@ -253,7 +259,7 @@ func match(parts []string, params []string, parent *pathPart) ([]string, *pathPa
 }
 
 // GetRoute gets the route and params for the given path
-func (r Router) GetRoute(path string) (map[string]string, []uint, error) {
+func (r Router) GetRoute(path string) (Params, Route, error) {
 	currentPart := ""
 	parts := []string{}
 
