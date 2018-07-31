@@ -1,6 +1,7 @@
 package way
 
 import (
+	"net/url"
 	"testing"
 )
 
@@ -10,6 +11,7 @@ func getRouter() Router {
 	r.Add("/foo/:bar", 0, 1)
 	r.Add("/:foo/bar", 0, 2)
 	r.Add("/:foo/bar/:suffix*", 1)
+	r.Add("/:foo/:foo/foo", 1, 2, 3)
 	return r
 }
 
@@ -19,14 +21,20 @@ func assertPath(actual string, expected string, t *testing.T) {
 	}
 }
 
-func assertParams(actual map[string]string, expected map[string]string, t *testing.T) {
+func assertParams(actual Params, expected Params, t *testing.T) {
 	if len(actual) != len(expected) {
 		t.Fatalf("Expected %v, got %v", expected, actual)
 	}
 
 	for key := range actual {
-		if actual[key] != expected[key] {
+		if len(actual[key]) != len(expected[key]) {
 			t.Fatalf("Expected %v, got %v", expected, actual)
+		}
+
+		for subkey := range actual[key] {
+			if actual[key][subkey] != expected[key][subkey] {
+				t.Fatalf("Expected %v, got %v", expected, actual)
+			}
 		}
 	}
 }
@@ -52,62 +60,74 @@ func assertNoError(err error, t *testing.T) {
 func TestGetRoute(t *testing.T) {
 	r := getRouter()
 
-	params, route, err := r.GetRoute("/")
+	u, _ := url.Parse("/")
+	params, route, err := r.GetRoute(u)
 	assertNoError(err, t)
-	assertParams(params, map[string]string{}, t)
+	assertParams(params, Params{}, t)
 	assertRoute(route, []uint{0}, t)
 
-	params, route, err = r.GetRoute("/foo/baz")
+	u, _ = url.Parse("/foo/baz")
+	params, route, err = r.GetRoute(u)
 	assertNoError(err, t)
-	assertParams(params, map[string]string{"bar": "baz"}, t)
+	assertParams(params, Params{"bar": []string{"baz"}}, t)
 	assertRoute(route, []uint{0, 1}, t)
 
-	params, route, err = r.GetRoute("/foo/ba+r")
+	u, _ = url.Parse("/foo/ba+r")
+	params, route, err = r.GetRoute(u)
 	assertNoError(err, t)
-	assertParams(params, map[string]string{"bar": "ba r"}, t)
+	assertParams(params, Params{"bar": []string{"ba r"}}, t)
 	assertRoute(route, []uint{0, 1}, t)
 
-	params, route, err = r.GetRoute("/fooo/bar")
+	u, _ = url.Parse("/fooo/bar")
+	params, route, err = r.GetRoute(u)
 	assertNoError(err, t)
-	assertParams(params, map[string]string{"foo": "fooo"}, t)
+	assertParams(params, Params{"foo": []string{"fooo"}}, t)
 	assertRoute(route, []uint{0, 2}, t)
 
-	params, route, err = r.GetRoute("/test/bar/an/interesting/suffix")
+	u, _ = url.Parse("/test/bar/an/interesting/suffix?foo=bar")
+	params, route, err = r.GetRoute(u)
 	assertNoError(err, t)
-	assertParams(params, map[string]string{"foo": "test", "suffix": "an/interesting/suffix"}, t)
+	assertParams(params, Params{"foo": []string{"test", "bar"}, "suffix": []string{"an/interesting/suffix"}}, t)
 	assertRoute(route, []uint{1}, t)
 
-	_, _, err = r.GetRoute("/faasdasd")
+	u, _ = url.Parse("/one/two/foo")
+	params, route, err = r.GetRoute(u)
+	assertNoError(err, t)
+	assertParams(params, Params{"foo": []string{"one", "two"}}, t)
+	assertRoute(route, []uint{1, 2, 3}, t)
+
+	u, _ = url.Parse("/faasdasd")
+	_, _, err = r.GetRoute(u)
 	if err != ErrNotFound {
 		t.Fatal("Expected error to be returned")
 	}
 }
 
-func TestGetPath(t *testing.T) {
+func TestGetURL(t *testing.T) {
 	r := getRouter()
 
-	path, err := r.GetPath(nil, 0)
+	path, err := r.GetURL(nil, 0)
 	assertNoError(err, t)
 	assertPath(path, "/", t)
 
-	path, err = r.GetPath(map[string]string{"bar": "ba z"}, 0, 1)
+	path, err = r.GetURL(Params{"bar": []string{"ba z", "bar"}}, 0, 1)
 	assertNoError(err, t)
-	assertPath(path, "/foo/ba+z", t)
+	assertPath(path, "/foo/ba+z?bar=bar", t)
 
-	path, err = r.GetPath(map[string]string{"foo": "fooo"}, 0, 2)
+	path, err = r.GetURL(Params{"foo": []string{"fooo"}}, 0, 2)
 	assertNoError(err, t)
 	assertPath(path, "/fooo/bar", t)
 
-	path, err = r.GetPath(map[string]string{"foo": "test", "suffix": "an/interesting/suffix"}, 1)
+	path, err = r.GetURL(Params{"foo": []string{"test"}, "suffix": []string{"an/interesting/suffix"}}, 1)
 	assertNoError(err, t)
 	assertPath(path, "/test/bar/an/interesting/suffix", t)
 
-	_, err = r.GetPath(nil, 5)
+	_, err = r.GetURL(nil, 5)
 	if err != ErrNotFound {
 		t.Fatal("Expected error to be returned")
 	}
 
-	_, err = r.GetPath(nil, 0, 2)
+	_, err = r.GetURL(nil, 0, 2)
 	if err != ErrMissingParam {
 		t.Fatal("Expected error to be returned")
 	}

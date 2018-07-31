@@ -7,7 +7,7 @@ import (
 )
 
 // Params hold information about provided or matched URL parameters
-type Params = map[string]string
+type Params = map[string][]string
 
 // Route contains the matched route
 type Route = []uint
@@ -184,8 +184,23 @@ var ErrMissingParam = errors.New("Missing parameter")
 // ErrMiddleSuffix is returned when the provided path contains a suffix not located at the end
 var ErrMiddleSuffix = errors.New("Suffix parameters can only happen at the end of the path")
 
-// GetPath gets the path from the given route and parameters
-func (r Router) GetPath(params Params, route ...uint) (string, error) {
+// Merge builds new parameters after merging provided ones
+func Merge(params ...Params) Params {
+	result := make(Params)
+
+	for _, p := range params {
+		for paramName, paramValues := range p {
+			for _, value := range paramValues {
+				result[paramName] = append(result[paramName], value)
+			}
+		}
+	}
+
+	return result
+}
+
+// GetURL gets the URL from the given route and parameters
+func (r Router) GetURL(originalParams Params, route ...uint) (string, error) {
 	parent := r.routeRoot
 	for _, i := range route {
 		parent = parent.children[i]
@@ -198,26 +213,39 @@ func (r Router) GetPath(params Params, route ...uint) (string, error) {
 		return "", ErrNotFound
 	}
 
+	params := Merge(originalParams)
 	path := ""
+
 	for _, bit := range parent.path {
 		if bit.isParam {
 			param := params[bit.part]
-			if param == "" {
+			if len(param) == 0 {
 				return "", ErrMissingParam
 			}
 
+			p := param[0]
+			params[bit.part] = param[1:]
+
 			if !bit.isSuffix {
-				param = url.QueryEscape(param)
+				p = url.QueryEscape(p)
 			}
 
-			path += "/" + param
+			path += "/" + p
 		} else {
 			path += "/" + bit.part
 		}
 	}
 
 	if path == "" {
-		return "/", nil
+		path = "/"
+	}
+
+	var values url.Values
+	values = params
+	query := values.Encode()
+
+	if query != "" {
+		path += "?" + query
 	}
 
 	return path, nil
@@ -258,10 +286,11 @@ func match(parts []string, params []string, parent *pathPart) ([]string, *pathPa
 	return nil, nil, ErrNotFound
 }
 
-// GetRoute gets the route and params for the given path
-func (r Router) GetRoute(path string) (Params, Route, error) {
+// GetRoute gets the route and params for the given URL
+func (r Router) GetRoute(urlToMatch *url.URL) (Params, Route, error) {
 	currentPart := ""
 	parts := []string{}
+	path := urlToMatch.Path
 
 	flush := func() (err error) {
 		if currentPart == "" {
@@ -286,13 +315,6 @@ func (r Router) GetRoute(path string) (Params, Route, error) {
 				return nil, nil, err
 			}
 
-		case '?':
-			err := flush()
-			if err != nil {
-				return nil, nil, err
-			}
-
-			break
 		default:
 			currentPart += string(c)
 		}
@@ -308,10 +330,10 @@ func (r Router) GetRoute(path string) (Params, Route, error) {
 		return nil, nil, err
 	}
 
-	params := make(map[string]string)
+	params := make(Params)
 	for i, p := range matchedPart.parameters {
-		params[p] = paramList[i]
+		params[p] = append(params[p], paramList[i])
 	}
 
-	return params, matchedPart.match, nil
+	return Merge(params, urlToMatch.Query()), matchedPart.match, nil
 }
