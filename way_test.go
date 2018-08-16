@@ -10,8 +10,12 @@ func getRouter() Router {
 	r.Add("/", 0)
 	r.Add("/foo/:bar", 0, 1)
 	r.Add("/:foo/bar", 0, 2)
-	r.Add("/:foo/bar/:suffix*", 1)
-	r.Add("/:foo/:foo/foo", 1, 2, 3)
+
+	r.AddAll(RouteMap{
+		"/:foo/bar/:suffix*": Route{1},
+		"/:foo/:foo/foo":     Route{1, 2, 3},
+	})
+
 	return r
 }
 

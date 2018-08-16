@@ -12,6 +12,9 @@ type Params = map[string][]string
 // Route contains the matched route
 type Route = []uint
 
+// RouteMap holds a list of route mappings
+type RouteMap = map[string]Route
+
 type pathPart struct {
 	children   map[string]*pathPart
 	suffix     *pathPart
@@ -172,6 +175,17 @@ func (r Router) Add(path string, route ...uint) error {
 	}
 
 	routeParent.path = matched
+	return nil
+}
+
+// AddAll adds all provided routes to the router
+func (r Router) AddAll(m RouteMap) error {
+	for key, value := range m {
+		if err := r.Add(key, value...); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
