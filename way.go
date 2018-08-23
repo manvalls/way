@@ -360,5 +360,12 @@ func (r Router) GetRoute(urlToMatch *url.URL) (Params, Route, error) {
 		params[p] = append(params[p], paramList[i])
 	}
 
-	return Merge(params, urlToMatch.Query()), matchedPart.match, nil
+	return Merge(params, urlToMatch.Query()), Clone(matchedPart.match), nil
+}
+
+// Clone returns a copy of the provided route
+func Clone(route Route) Route {
+	result := make(Route, len(route))
+	copy(result, route)
+	return result
 }
