@@ -7,13 +7,13 @@ import (
 
 func getRouter() Router {
 	r := BuildRouter(RouteMap{
-		"/:foo/bar/:suffix*": Route{1},
-		"/:foo/:foo/foo":     Route{1, 2, 3},
+		"/:foo/bar/:suffix*": Route{"1"},
+		"/:foo/:foo/foo":     Route{"1", "2", "3"},
 	})
 
-	r.Add("/", 0)
-	r.Add("/foo/:bar", 0, 1)
-	r.Add("/:foo/bar", 0, 2)
+	r.Add("/", "0")
+	r.Add("/foo/:bar", "0", "1")
+	r.Add("/:foo/bar", "0", "2")
 	return r
 }
 
@@ -41,7 +41,7 @@ func assertParams(actual Params, expected Params, t *testing.T) {
 	}
 }
 
-func assertRoute(actual []uint, expected []uint, t *testing.T) {
+func assertRoute(actual []string, expected []string, t *testing.T) {
 	if len(actual) != len(expected) {
 		t.Fatalf("Expected %v, got %v", expected, actual)
 	}
@@ -66,37 +66,37 @@ func TestGetRoute(t *testing.T) {
 	params, route, err := r.GetRoute(u)
 	assertNoError(err, t)
 	assertParams(params, Params{}, t)
-	assertRoute(route, []uint{0}, t)
+	assertRoute(route, []string{"0"}, t)
 
 	u, _ = url.Parse("/foo/baz")
 	params, route, err = r.GetRoute(u)
 	assertNoError(err, t)
 	assertParams(params, Params{"bar": []string{"baz"}}, t)
-	assertRoute(route, []uint{0, 1}, t)
+	assertRoute(route, []string{"0", "1"}, t)
 
 	u, _ = url.Parse("/foo/ba+r")
 	params, route, err = r.GetRoute(u)
 	assertNoError(err, t)
 	assertParams(params, Params{"bar": []string{"ba r"}}, t)
-	assertRoute(route, []uint{0, 1}, t)
+	assertRoute(route, []string{"0", "1"}, t)
 
 	u, _ = url.Parse("/fooo/bar")
 	params, route, err = r.GetRoute(u)
 	assertNoError(err, t)
 	assertParams(params, Params{"foo": []string{"fooo"}}, t)
-	assertRoute(route, []uint{0, 2}, t)
+	assertRoute(route, []string{"0", "2"}, t)
 
 	u, _ = url.Parse("/test/bar/an/interesting/suffix?foo=bar")
 	params, route, err = r.GetRoute(u)
 	assertNoError(err, t)
 	assertParams(params, Params{"foo": []string{"test", "bar"}, "suffix": []string{"an/interesting/suffix"}}, t)
-	assertRoute(route, []uint{1}, t)
+	assertRoute(route, []string{"1"}, t)
 
 	u, _ = url.Parse("/one/two/foo")
 	params, route, err = r.GetRoute(u)
 	assertNoError(err, t)
 	assertParams(params, Params{"foo": []string{"one", "two"}}, t)
-	assertRoute(route, []uint{1, 2, 3}, t)
+	assertRoute(route, []string{"1", "2", "3"}, t)
 
 	u, _ = url.Parse("/faasdasd")
 	_, _, err = r.GetRoute(u)
@@ -108,28 +108,28 @@ func TestGetRoute(t *testing.T) {
 func TestGetURL(t *testing.T) {
 	r := getRouter()
 
-	path, err := r.GetURL(nil, 0)
+	path, err := r.GetURL(nil, "0")
 	assertNoError(err, t)
 	assertPath(path, "/", t)
 
-	path, err = r.GetURL(Params{"bar": []string{"ba z", "bar"}}, 0, 1)
+	path, err = r.GetURL(Params{"bar": []string{"ba z", "bar"}}, "0", "1")
 	assertNoError(err, t)
 	assertPath(path, "/foo/ba+z?bar=bar", t)
 
-	path, err = r.GetURL(Params{"foo": []string{"fooo"}}, 0, 2)
+	path, err = r.GetURL(Params{"foo": []string{"fooo"}}, "0", "2")
 	assertNoError(err, t)
 	assertPath(path, "/fooo/bar", t)
 
-	path, err = r.GetURL(Params{"foo": []string{"test"}, "suffix": []string{"an/interesting/suffix"}}, 1)
+	path, err = r.GetURL(Params{"foo": []string{"test"}, "suffix": []string{"an/interesting/suffix"}}, "1")
 	assertNoError(err, t)
 	assertPath(path, "/test/bar/an/interesting/suffix", t)
 
-	_, err = r.GetURL(nil, 5)
+	_, err = r.GetURL(nil, "5")
 	if err != ErrNotFound {
 		t.Fatal("Expected error to be returned")
 	}
 
-	_, err = r.GetURL(nil, 0, 2)
+	_, err = r.GetURL(nil, "0", "2")
 	if err != ErrMissingParam {
 		t.Fatal("Expected error to be returned")
 	}

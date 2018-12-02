@@ -10,7 +10,7 @@ import (
 type Params = map[string][]string
 
 // Route contains the matched route
-type Route = []uint
+type Route = []string
 
 // RouteMap holds a list of route mappings
 type RouteMap = map[string]Route
@@ -18,12 +18,12 @@ type RouteMap = map[string]Route
 type pathPart struct {
 	children   map[string]*pathPart
 	suffix     *pathPart
-	match      []uint
+	match      []string
 	parameters []string
 }
 
 type routePart struct {
-	children map[uint]*routePart
+	children map[string]*routePart
 	path     []*matchedPathBit
 }
 
@@ -33,6 +33,8 @@ type matchedPathBit struct {
 	isSuffix bool
 }
 
+var reservedChars = ", ?"
+
 // Router holds the list of routings and mappings
 type Router struct {
 	pathRoot  *pathPart
@@ -41,7 +43,7 @@ type Router struct {
 
 // NewRouter builds a new router instance
 func NewRouter() Router {
-	return Router{&pathPart{children: map[string]*pathPart{}}, &routePart{children: map[uint]*routePart{}}}
+	return Router{&pathPart{children: map[string]*pathPart{}}, &routePart{children: map[string]*routePart{}}}
 }
 
 // BuildRouter builds a new router instance and adds the provided routes to it,
@@ -56,7 +58,7 @@ func BuildRouter(m RouteMap) Router {
 }
 
 // Add adds a route to the router
-func (r Router) Add(path string, route ...uint) error {
+func (r Router) Add(path string, route ...string) error {
 	pathParent := r.pathRoot
 	currentPart := ""
 	currentParam := ""
@@ -176,9 +178,13 @@ func (r Router) Add(path string, route ...uint) error {
 
 	routeParent := r.routeRoot
 	for _, routeBit := range route {
+		if strings.ContainsAny(routeBit, reservedChars) {
+			return ErrInvalidChars
+		}
+
 		nextParent := routeParent.children[routeBit]
 		if nextParent == nil {
-			nextParent = &routePart{children: map[uint]*routePart{}}
+			nextParent = &routePart{children: map[string]*routePart{}}
 			routeParent.children[routeBit] = nextParent
 		}
 
@@ -209,6 +215,9 @@ var ErrMissingParam = errors.New("Missing parameter")
 // ErrMiddleSuffix is returned when the provided path contains a suffix not located at the end
 var ErrMiddleSuffix = errors.New("Suffix parameters can only happen at the end of the path")
 
+// ErrInvalidChars is returned when invalid characters are used in the route
+var ErrInvalidChars = errors.New("Invalid characters")
+
 // Merge builds new parameters after merging provided ones
 func Merge(params ...Params) Params {
 	result := make(Params)
@@ -225,9 +234,13 @@ func Merge(params ...Params) Params {
 }
 
 // GetURL gets the URL from the given route and parameters
-func (r Router) GetURL(originalParams Params, route ...uint) (string, error) {
+func (r Router) GetURL(originalParams Params, route ...string) (string, error) {
 	parent := r.routeRoot
 	for _, i := range route {
+		if strings.ContainsAny(i, reservedChars) {
+			return "", ErrInvalidChars
+		}
+
 		parent = parent.children[i]
 		if parent == nil {
 			return "", ErrNotFound
