@@ -48,10 +48,13 @@ func NewRouter() Router {
 
 // BuildRouter builds a new router instance and adds the provided routes to it,
 // panicking if there's an error adding the routes
-func BuildRouter(m RouteMap) Router {
+func BuildRouter(maps ...RouteMap) Router {
 	router := NewRouter()
-	if err := router.AddAll(m); err != nil {
-		panic(err)
+
+	for _, m := range maps {
+		if err := router.AddAll(m); err != nil {
+			panic(err)
+		}
 	}
 
 	return router
