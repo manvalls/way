@@ -379,6 +379,26 @@ func (r Router) GetRoute(urlToMatch *url.URL) (Params, Route, error) {
 	return Merge(params, urlToMatch.Query()), Clone(matchedPart.match), nil
 }
 
+// MustGetURL gets the URL from the given route and parameters and panics if there's an error
+func (r Router) MustGetURL(originalParams Params, route ...string) string {
+	url, err := r.GetURL(originalParams, route...)
+	if err != nil {
+		panic(err)
+	}
+
+	return url
+}
+
+// MustGetRoute gets the URL from the given route and parameters and panics if there's an error
+func (r Router) MustGetRoute(urlToMatch *url.URL) (Params, Route) {
+	params, route, err := r.GetRoute(urlToMatch)
+	if err != nil {
+		panic(err)
+	}
+
+	return params, route
+}
+
 // Clone returns a copy of the provided route
 func Clone(route Route) Route {
 	result := make(Route, len(route))
